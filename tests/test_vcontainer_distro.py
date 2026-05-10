@@ -110,15 +110,17 @@ class TestVcontainerConf:
         content = (meta_virt_dir / "conf" / "distro" / "vcontainer.conf").read_text()
         assert 'DISTRO = "vcontainer"' in content
 
-    def test_no_bbmask(self, meta_virt_dir):
-        """vcontainer must NOT have BBMASK — OCI tooling needs full package set."""
+    def test_has_lighter_bbmask(self, meta_virt_dir):
+        """vcontainer uses its own lighter BBMASK, not vruntime's."""
         content = (meta_virt_dir / "conf" / "distro" / "vcontainer.conf").read_text()
+        assert "vcontainer-bbmask.inc" in content
+        # Must NOT use vruntime's BBMASK (it blocks OCI tooling)
         for line in content.splitlines():
             stripped = line.strip()
             if stripped.startswith("#"):
                 continue
-            assert "bbmask" not in stripped.lower(), \
-                f"vcontainer.conf must not include BBMASK files: {stripped}"
+            assert "vruntime-bbmask.inc" not in stripped, \
+                "vcontainer must not use vruntime-bbmask.inc (blocks OCI tooling)"
 
     def test_no_image_fstypes(self, meta_virt_dir):
         """vcontainer must NOT set IMAGE_FSTYPES -- 'oci' type needs image-oci.bbclass
@@ -142,6 +144,43 @@ class TestVcontainerConf:
                 "DISTRO_FEATURES belongs in vruntime-base.inc"
             assert not stripped.startswith("DISTRO_FEATURES_OPTED_OUT"), \
                 "DISTRO_FEATURES_OPTED_OUT belongs in vruntime-base.inc"
+
+
+class TestVcontainerBbmask:
+    """Test the vcontainer-bbmask.inc keeps OCI tooling available."""
+
+    def test_exists(self, meta_virt_dir):
+        path = meta_virt_dir / "conf" / "distro" / "include" / "vcontainer-bbmask.inc"
+        assert path.exists()
+
+    def test_masks_graphics(self, meta_virt_dir):
+        content = (meta_virt_dir / "conf" / "distro" / "include" / "vcontainer-bbmask.inc").read_text()
+        assert "recipes-graphics" in content
+        assert "recipes-sato" in content
+
+    def test_masks_virtualization_platforms(self, meta_virt_dir):
+        content = (meta_virt_dir / "conf" / "distro" / "include" / "vcontainer-bbmask.inc").read_text()
+        assert "recipes-extended/xen/" in content
+        assert "recipes-extended/libvirt/" in content
+
+    def test_does_not_mask_oci_tooling(self, meta_virt_dir):
+        """OCI tooling must NOT be masked — this is the key difference from vruntime."""
+        content = (meta_virt_dir / "conf" / "distro" / "include" / "vcontainer-bbmask.inc").read_text()
+        # Check non-comment lines for things that must stay unmasked
+        for line in content.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("#"):
+                continue
+            assert "recipes-containers/umoci/" not in stripped, "umoci must not be masked"
+            assert "recipes-containers/container-registry/" not in stripped, "container-registry must not be masked"
+            assert "recipes-extended/images/" not in stripped, "container image recipes must not be masked"
+            assert "recipes-containers/oci-image-tools/" not in stripped, "oci-image-tools must not be masked"
+            assert "recipes-containers/sloci-image/" not in stripped, "sloci-image must not be masked"
+
+    def test_masks_orchestration(self, meta_virt_dir):
+        content = (meta_virt_dir / "conf" / "distro" / "include" / "vcontainer-bbmask.inc").read_text()
+        assert "recipes-containers/kubernetes/" in content
+        assert "recipes-containers/k3s/" in content
 
 
 class TestVruntimeConfRefactored:

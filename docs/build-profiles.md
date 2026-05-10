@@ -232,11 +232,16 @@ The `myapp-container.bb` recipe must inherit `image-oci` and produce OCI output.
 | | vruntime | vcontainer |
 |--|----------|------------|
 | **Purpose** | VM rootfs for vdkr/vpdmn | OCI container images |
-| **BBMASK** | Yes (minimal) | No (full packages) |
+| **BBMASK** | Aggressive (blocks OCI tools) | Lighter (keeps OCI tools) |
 | **Init** | busybox | (per recipe) |
 | **IMAGE_FSTYPES** | ext4 | (per recipe) |
 | **Multiconfigs** | vruntime-aarch64, vruntime-x86-64 | container-aarch64, container-x86-64 |
 | **Shared base** | vruntime-base.inc | vruntime-base.inc |
+
+Both distros mask graphics, multimedia, desktop, virtualization platforms,
+and orchestration tools. The difference is that vruntime additionally masks
+OCI tooling (umoci, container-registry, image recipes, sloci) that
+vcontainer needs for building container images.
 
 ## Design Notes
 
